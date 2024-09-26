@@ -42,13 +42,19 @@ mqtt_client.on("error", function (error) {
 });
 
 mqtt_client.on("message", function (topic, message) {
+  const validJsonString = message.toString().replace(/'/g, '"');
+
+  const jsonObject = JSON.parse(validJsonString);
+
   // called each time a message is received
-  console.log("Received message:", topic, message.toString());
-  io.emit("mqtt-message", { topic, message: message.toString() });
+  console.log("Received message:", topic, jsonObject);
+  io.emit("mqtt-message", { topic, message: jsonObject });
 });
 
 // subscribe to topic 'my/test/topic'
 mqtt_client.subscribe("my/test/topic");
+mqtt_client.subscribe("gps");
+mqtt_client.subscribe("mpu");
 
 app.get("/", (req, res) => {
   res.send("Socket.IO server running");
