@@ -46,8 +46,6 @@ mqtt_client.on("message", function (topic, message) {
 
   const jsonObject = JSON.parse(validJsonString);
 
-  // called each time a message is received
-  console.log("Received message:", topic, jsonObject);
   io.emit("mqtt-message", { topic, message: jsonObject });
 });
 
