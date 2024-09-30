@@ -2,6 +2,8 @@ const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
 const cors = require("cors");
+const schedule = require("node-schedule");
+
 require("dotenv").config();
 
 const app = express();
@@ -53,6 +55,10 @@ mqtt_client.on("message", function (topic, message) {
 mqtt_client.subscribe("my/test/topic");
 mqtt_client.subscribe("gps");
 mqtt_client.subscribe("mpu");
+
+const job = schedule.scheduleJob("* /1 * * * *", function () {
+  console.log("The answer to life, the universe, and everything!");
+});
 
 app.get("/", (req, res) => {
   res.send("Socket.IO server running");
