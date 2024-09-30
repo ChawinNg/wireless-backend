@@ -54,19 +54,22 @@ mqtt_client.on("message", function (topic, message) {
 
   let date = new Date();
 
-  uploadGyroscope(
+  gyroscopeMagnitude = uploadGyroscope(
     jsonObject.gyroscope.x,
     jsonObject.gyroscope.y,
     jsonObject.gyroscope.z,
     date
   );
-  uploadAccelerometer(
+  accelerometerMagnitude = uploadAccelerometer(
     jsonObject.accelerometer.x,
     jsonObject.accelerometer.y,
     jsonObject.accelerometer.z,
     date
   );
 
+  if (gyroscopeMagnitude > 120 && accelerometerMagnitude > 10) {
+    io.emit("fall-detection", "alert", { message: true });
+  }
   io.emit("mqtt-message", { topic, message: jsonObject });
 });
 
@@ -99,6 +102,7 @@ async function uploadGyroscope(x, y, z, date) {
     .setTimestamp(date);
 
   await client.write(gyroscopePoint, "wireless");
+  return magnitude;
 }
 
 async function uploadAccelerometer(x, y, z, date) {
@@ -112,6 +116,7 @@ async function uploadAccelerometer(x, y, z, date) {
     .setTimestamp(date);
 
   await client.write(accelerometerPoint, "wireless");
+  return magnitude;
 }
 
 async function uploadGPS(latitude, longitude, altitude) {
