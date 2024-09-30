@@ -3,7 +3,7 @@ const http = require("http");
 const socketIo = require("socket.io");
 const cors = require("cors");
 require("dotenv").config();
-const { InfluxDBClient, Point } = require("@influxdata/influxdb3-client");
+const { Point, InfluxDB } = require("@influxdata/influxdb-client");
 
 const app = express();
 const server = http.createServer(app);
@@ -78,8 +78,8 @@ mqtt_client.on("message", async function (topic, message) {
 mqtt_client.subscribe("mpu");
 
 // สร้าง InfluxDB client โดยใช้ environment variables
-const client = new InfluxDBClient({
-  host: process.env.INFLUXDB_URL,
+const client = new InfluxDB({
+  url: process.env.INFLUXDB_URL,
   token: process.env.INFLUXDB_TOKEN,
 });
 
@@ -93,41 +93,60 @@ const client = new InfluxDBClient({
 // }
 
 async function uploadGyroscope(x, y, z, date) {
-  let magnitude = Math.sqrt(y * y + z * z);
-
-  const gyroscopePoint = Point.measurement("gyroscope")
-    .setFloatField("x", x)
-    .setFloatField("y", y)
-    .setFloatField("z", z)
-    .setFloatField("magnitude", magnitude)
-    .setTimestamp(date);
-
-  await client.write(gyroscopePoint, "wireless");
+  const writeApi = client.getWriteApi(
+    process.env.INFLUXDB_ORG,
+    process.env.INFLUXDB_BUCKET
+  );
+  const magnitude = Math.sqrt(y * y + z * z);
+  const point = new Point("gyroscope")
+    .floatField("x", x)
+    .floatField("y", y)
+    .floatField("z", z)
+    .floatField("magnitude", magnitude)
+    .timestamp(date);
+  writeApi.writePoint(point);
+  writeApi
+    .close()
+    .then(() => console.log("write point success"))
+    .catch((error) => console.error(error));
   return magnitude;
 }
 
 async function uploadAccelerometer(x, y, z, date) {
-  let magnitude = Math.abs(x);
-
-  const accelerometerPoint = Point.measurement("accelerometer")
-    .setFloatField("x", x)
-    .setFloatField("y", y)
-    .setFloatField("z", z)
-    .setFloatField("magnitude", magnitude)
-    .setTimestamp(date);
-
-  await client.write(accelerometerPoint, "wireless");
+  const writeApi = client.getWriteApi(
+    process.env.INFLUXDB_ORG,
+    process.env.INFLUXDB_BUCKET
+  );
+  const magnitude = Math.abs(x);
+  const point = new Point("accelerometer")
+    .floatField("x", x)
+    .floatField("y", y)
+    .floatField("z", z)
+    .floatField("magnitude", magnitude)
+    .timestamp(date);
+  writeApi.writePoint(point);
+  writeApi
+    .close()
+    .then(() => console.log("write point success"))
+    .catch((error) => console.error(error));
   return magnitude;
 }
 
 async function uploadGPS(latitude, longitude, altitude) {
-  const gpsPoint = Point.measurement("gps")
-    .setFloatField("latitude", latitude)
-    .setFloatField("longitude", longitude)
-    .setFloatField("altitude", altitude)
-    .setTimestamp(new Date());
-
-  await client.write(gpsPoint, "wireless");
+  const writeApi = client.getWriteApi(
+    process.env.INFLUXDB_ORG,
+    process.env.INFLUXDB_BUCKET
+  );
+  const point = new Point("gps")
+    .floatField("latitude", latitude)
+    .floatField("longitude", longitude)
+    .floatField("altitude", altitude)
+    .timestamp(new Date());
+  writeApi.writePoint(point);
+  writeApi
+    .close()
+    .then(() => console.log("write point success"))
+    .catch((error) => console.error(error));
 }
 
 // // ตัวอย่างการอัพโหลดข้อมูลหลายรอบ
@@ -148,33 +167,38 @@ app.get("/", (req, res) => {
 });
 
 app.get("/data", async (req, res) => {
+  console.log(process.env.INFLUXDB_BUCKET);
+  console.log(process.env.INFLUXDB_ORG);
+  console.log(process.env.INFLUXDB_URL);
+  console.log(process.env.INFLUXDB_TOKEN);
+  const queryApi = client.getQueryApi(process.env.INFLUXDB_ORG);
   const query = `
-  SELECT * 
-  FROM "gyroscope" 
-  WHERE 
-  time >= now() - interval '1 hour' 
-  AND 
-  ("x" IS NOT NULL OR "y" IS NOT NULL OR "z" IS NOT NULL)
+    from(bucket: "wireless")
+      |> range(start: -18h)
+      |> filter(fn: (r) => r._measurement == "accelerometer")
+      |> filter(fn: (r) => r._field == "x" or r._field == "y" or r._field == "z" or r._field == "magnitude")
+      |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
   `;
-
   try {
-    const rows = await client.queryPoints(query, "wireless");
-    // const formattedRows = rows.map((row) => ({
-    //   time: row._time,
-    //   x: row.x,
-    //   y: row.y,
-    //   z: row.z,
-    //   magnitude: row.magnitude,
-    // }));
-    console.log(rows);
-
-    res.json(rows); // Send the data as a JSON response
+    const rows = [];
+    queryApi.queryRows(query, {
+      next(row, tableMeta) {
+        const data = tableMeta.toObject(row);
+        rows.push(data);
+      },
+      complete() {
+        res.json(rows); // Send the data as a JSON response
+      },
+      error(error) {
+        console.error("Error querying data:", error);
+        res.status(500).send("Error querying data");
+      },
+    });
   } catch (error) {
     console.error("Error querying data:", error);
     res.status(500).send("Error querying data");
   }
 });
-
 // Socket.IO connection handling
 io.on("connection", (socket) => {
   console.log("A user connected");
