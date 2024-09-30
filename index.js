@@ -67,7 +67,7 @@ mqtt_client.on("message", function (topic, message) {
     date
   );
 
-  if (gyroscopeMagnitude > 120 && accelerometerMagnitude > 10) {
+  if (gyroscopeMagnitude > 140 && accelerometerMagnitude > 12) {
     io.emit("fall-detection", "alert", { message: true });
   }
   io.emit("mqtt-message", { topic, message: jsonObject });
