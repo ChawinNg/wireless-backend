@@ -42,7 +42,7 @@ mqtt_client.on("error", function (error) {
   console.log(error);
 });
 
-mqtt_client.on("message", function (topic, message) {
+mqtt_client.on("message", async function (topic, message) {
   // called each time a message is received
   // console.log("Received message:", topic, message.toString());
   // io.emit("mqtt-message", { topic, message: message.toString() });
@@ -50,25 +50,26 @@ mqtt_client.on("message", function (topic, message) {
   const validJsonString = message.toString().replace(/'/g, '"');
 
   const jsonObject = JSON.parse(validJsonString);
-  console.log(jsonObject);
+  // console.log(jsonObject);
 
   let date = new Date();
 
-  gyroscopeMagnitude = uploadGyroscope(
+  const gyroscopeMagnitude = await uploadGyroscope(
     jsonObject.gyroscope.x,
     jsonObject.gyroscope.y,
     jsonObject.gyroscope.z,
     date
   );
-  accelerometerMagnitude = uploadAccelerometer(
+  const accelerometerMagnitude = await uploadAccelerometer(
     jsonObject.accelerometer.x,
     jsonObject.accelerometer.y,
     jsonObject.accelerometer.z,
     date
   );
 
-  if (gyroscopeMagnitude > 140 && accelerometerMagnitude > 12) {
-    io.emit("fall-detection", "alert", { message: true });
+  if (gyroscopeMagnitude > 120 && accelerometerMagnitude > 10) {
+    console.log("true");
+    io.emit("alert", { message: true });
   }
   io.emit("mqtt-message", { topic, message: jsonObject });
 });
