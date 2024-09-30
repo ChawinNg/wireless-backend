@@ -44,23 +44,39 @@ mqtt_client.on("error", function (error) {
 
 mqtt_client.on("message", function (topic, message) {
   // called each time a message is received
-  console.log("Received message:", topic, message.toString());
-  io.emit("mqtt-message", { topic, message: message.toString() });
+  // console.log("Received message:", topic, message.toString());
+  // io.emit("mqtt-message", { topic, message: message.toString() });
+
+  const validJsonString = message.toString().replace(/'/g, '"');
+
+  const jsonObject = JSON.parse(validJsonString);
+  console.log(jsonObject);
+
+  uploadGyroscope(
+    jsonObject.Gyroscope.x,
+    jsonObject.Gyroscope.y,
+    jsonObject.Gyroscope.z
+  );
+  uploadAccelerometer(
+    jsonObject.Accelerometer.x,
+    jsonObject.Accelerometer.y,
+    jsonObject.Accelerometer.z
+  );
+
+  io.emit("mqtt-message", { topic, message: jsonObject });
 });
 
 // subscribe to topic 'my/test/topic'
-mqtt_client.subscribe("my/test/topic");
+mqtt_client.subscribe("test/mpu");
 
 // สร้าง InfluxDB client โดยใช้ environment variables
 const client = new InfluxDBClient({
-  host: "https://us-east-1-1.aws.cloud2.influxdata.com",
-  token:
-    "jpMFNwx0dwjPpOoTXfhYB2RmcaN6z9oGqGqupOI2gDMEm55dgSXJSaiHND-2RC2VBRmjv2uliXg1teuwHXjJrw==",
+  host: process.env.INFLUXDB_URL,
+  token: process.env.INFLUXDB_TOKEN,
 });
 
-async function uploadGyroscope(location, x, y, z) {
+async function uploadGyroscope(x, y, z) {
   const gyroscopePoint = Point.measurement("gyroscope")
-    .setTag("location", location)
     .setFloatField("x", x)
     .setFloatField("y", y)
     .setFloatField("z", z)
@@ -69,9 +85,18 @@ async function uploadGyroscope(location, x, y, z) {
   await client.write(gyroscopePoint, "wireless");
 }
 
-async function uploadGPS(location, latitude, longitude, altitude) {
+async function uploadAccelerometer(x, y, z) {
+  const accelerometerPoint = Point.measurement("accelerometer")
+    .setFloatField("x", x)
+    .setFloatField("y", y)
+    .setFloatField("z", z)
+    .setTimestamp(new Date());
+
+  await client.write(accelerometerPoint, "wireless");
+}
+
+async function uploadGPS(latitude, longitude, altitude) {
   const gpsPoint = Point.measurement("gps")
-    .setTag("location", location)
     .setFloatField("latitude", latitude)
     .setFloatField("longitude", longitude)
     .setFloatField("altitude", altitude)
@@ -80,33 +105,18 @@ async function uploadGPS(location, latitude, longitude, altitude) {
   await client.write(gpsPoint, "wireless");
 }
 
-/**
- * ฟังก์ชันปิดการเชื่อมต่อ
- */
-async function closeConnection() {
-  try {
-    await client.close();
-    console.log("Data uploaded successfully!");
-  } catch (err) {
-    console.error("Error uploading data: ", err);
-  }
-}
+// // ตัวอย่างการอัพโหลดข้อมูลหลายรอบ
+// async function uploadData() {
+//   // อัพโหลดข้อมูล Gyroscope
+//   uploadGyroscope("office", 0.12, -0.34, 1.01);
+//   uploadGyroscope("office", 0.15, -0.3, 1.02); // อัพโหลดรอบที่สอง
 
-// ตัวอย่างการอัพโหลดข้อมูลหลายรอบ
-async function uploadData() {
-  // อัพโหลดข้อมูล Gyroscope
-  uploadGyroscope("office", 0.12, -0.34, 1.01);
-  uploadGyroscope("office", 0.15, -0.3, 1.02); // อัพโหลดรอบที่สอง
+//   // อัพโหลดข้อมูล GPS
+//   uploadGPS("car", 13.7563, 100.5018, 5.2);
+//   uploadGPS("car", 13.758, 100.503, 5.5); // อัพโหลดรอบที่สอง
+// }
 
-  // อัพโหลดข้อมูล GPS
-  uploadGPS("car", 13.7563, 100.5018, 5.2);
-  uploadGPS("car", 13.758, 100.503, 5.5); // อัพโหลดรอบที่สอง
-
-  // ปิดการเชื่อมต่อเมื่ออัพโหลดเสร็จ
-  await closeConnection();
-}
-
-uploadData();
+// uploadData();
 
 app.get("/", (req, res) => {
   res.send("Socket.IO server running");
