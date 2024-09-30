@@ -106,7 +106,7 @@ async function uploadGyroscope(x, y, z, date) {
 }
 
 async function uploadAccelerometer(x, y, z, date) {
-  let magnitude = x;
+  let magnitude = Math.abs(x);
 
   const accelerometerPoint = Point.measurement("accelerometer")
     .setFloatField("x", x)
