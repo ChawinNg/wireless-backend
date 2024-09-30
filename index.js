@@ -44,7 +44,7 @@ mqtt_client.on("error", function (error) {
 
 mqtt_client.on("message", function (topic, message) {
   // called each time a message is received
-  console.log("Received message:", topic, message.toString());
+  // console.log("Received message:", topic, message.toString());
   // io.emit("mqtt-message", { topic, message: message.toString() });
 
   const validJsonString = message.toString().replace(/'/g, '"');
@@ -92,7 +92,7 @@ const client = new InfluxDBClient({
 // }
 
 async function uploadGyroscope(x, y, z, date) {
-  let magnitude = Math.sqrt(x * x + y * y + z * z);
+  let magnitude = Math.sqrt(y * y + z * z);
 
   const gyroscopePoint = Point.measurement("gyroscope")
     .setFloatField("x", x)
@@ -106,7 +106,7 @@ async function uploadGyroscope(x, y, z, date) {
 }
 
 async function uploadAccelerometer(x, y, z, date) {
-  let magnitude = Math.sqrt(x * x + y * y + z * z);
+  let magnitude = x;
 
   const accelerometerPoint = Point.measurement("accelerometer")
     .setFloatField("x", x)
@@ -147,18 +147,27 @@ app.get("/", (req, res) => {
 });
 
 app.get("/data", async (req, res) => {
-  const query = "";
+  const query = `
+  SELECT * 
+  FROM "gyroscope" 
+  WHERE 
+  time >= now() - interval '1 hour' 
+  AND 
+  ("x" IS NOT NULL OR "y" IS NOT NULL OR "z" IS NOT NULL)
+  `;
 
   try {
-    const rows = await client.query(query, "wireless");
-    const formattedRows = rows.map((row) => ({
-      time: row._time,
-      x: row.x,
-      y: row.y,
-      z: row.z,
-    }));
+    const rows = await client.queryPoints(query, "wireless");
+    // const formattedRows = rows.map((row) => ({
+    //   time: row._time,
+    //   x: row.x,
+    //   y: row.y,
+    //   z: row.z,
+    //   magnitude: row.magnitude,
+    // }));
+    console.log(rows);
 
-    res.json(formattedRows); // Send the data as a JSON response
+    res.json(rows); // Send the data as a JSON response
   } catch (error) {
     console.error("Error querying data:", error);
     res.status(500).send("Error querying data");
