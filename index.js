@@ -48,35 +48,44 @@ mqtt_client.on("message", async function (topic, message) {
   // console.log("Received message:", topic, message.toString());
   // io.emit("mqtt-message", { topic, message: message.toString() });
 
-  const validJsonString = message.toString().replace(/'/g, '"');
+  if (topic === "mpu") {
+    const validJsonString = message.toString().replace(/'/g, '"');
 
-  const jsonObject = JSON.parse(validJsonString);
-  // console.log(jsonObject);
+    const jsonObject = JSON.parse(validJsonString);
+    // console.log(jsonObject);
 
-  let date = new Date();
+    let date = new Date();
 
-  const gyroscopeMagnitude = await uploadGyroscope(
-    jsonObject.gyroscope.x,
-    jsonObject.gyroscope.y,
-    jsonObject.gyroscope.z,
-    date
-  );
-  const accelerometerMagnitude = await uploadAccelerometer(
-    jsonObject.accelerometer.x,
-    jsonObject.accelerometer.y,
-    jsonObject.accelerometer.z,
-    date
-  );
+    const gyroscopeMagnitude = await uploadGyroscope(
+      jsonObject.gyroscope.x,
+      jsonObject.gyroscope.y,
+      jsonObject.gyroscope.z,
+      date
+    );
+    const accelerometerMagnitude = await uploadAccelerometer(
+      jsonObject.accelerometer.x,
+      jsonObject.accelerometer.y,
+      jsonObject.accelerometer.z,
+      date
+    );
 
-  if (gyroscopeMagnitude > 120 && accelerometerMagnitude > 10) {
-    console.log("true");
-    io.emit("alert", { message: true });
+    if (gyroscopeMagnitude > 120 && accelerometerMagnitude > 10) {
+      console.log("true");
+      io.emit("alert", { message: true });
+    }
+    io.emit("mqtt-message", { topic, message: jsonObject });
+  } else if (topic === "gps") {
+    const validJsonString = message.toString().replace(/'/g, '"');
+    const jsonObject = JSON.parse(validJsonString);
+    console.log(jsonObject);
+    // uploadGPS(jsonObject.latitude, jsonObject.longitude, jsonObject.altitude);
+    // io.emit("mqtt-message", { topic, message: jsonObject });
   }
-  io.emit("mqtt-message", { topic, message: jsonObject });
 });
 
 // subscribe to topic 'my/test/topic'
 mqtt_client.subscribe("mpu");
+mqtt.client.subscribe("gps");
 
 const job = schedule.scheduleJob("* /1 * * * *", function () {
   console.log("The answer to life, the universe, and everything!");
