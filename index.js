@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
 const cors = require("cors");
+const schedule = require("node-schedule");
 require("dotenv").config();
 const { Point, InfluxDB } = require("@influxdata/influxdb-client");
 
@@ -77,6 +78,10 @@ mqtt_client.on("message", async function (topic, message) {
 // subscribe to topic 'my/test/topic'
 mqtt_client.subscribe("mpu");
 
+const job = schedule.scheduleJob("* /1 * * * *", function () {
+  console.log("The answer to life, the universe, and everything!");
+});
+
 // สร้าง InfluxDB client โดยใช้ environment variables
 const client = new InfluxDB({
   url: process.env.INFLUXDB_URL,
@@ -149,6 +154,20 @@ async function uploadGPS(latitude, longitude, altitude) {
     .catch((error) => console.error(error));
 }
 
+function getMaxMagnitudePerMinute(events) {
+  const maxMagnitudes = {};
+
+  events.forEach((event) => {
+    const date = new Date(event._time);
+    const minute = date.toISOString().slice(0, 16); // Get the year, month, day, hour, and minute
+
+    if (!maxMagnitudes[minute] || event.magnitude > maxMagnitudes[minute]) {
+      maxMagnitudes[minute] = event.magnitude;
+    }
+  });
+
+  return maxMagnitudes;
+}
 // // ตัวอย่างการอัพโหลดข้อมูลหลายรอบ
 // async function uploadData() {
 //   // อัพโหลดข้อมูล Gyroscope
@@ -174,7 +193,7 @@ app.get("/data", async (req, res) => {
   const queryApi = client.getQueryApi(process.env.INFLUXDB_ORG);
   const query = `
     from(bucket: "wireless")
-      |> range(start: -18h)
+      |> range(start: -20h)
       |> filter(fn: (r) => r._measurement == "accelerometer")
       |> filter(fn: (r) => r._field == "x" or r._field == "y" or r._field == "z" or r._field == "magnitude")
       |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
@@ -187,7 +206,11 @@ app.get("/data", async (req, res) => {
         rows.push(data);
       },
       complete() {
-        res.json(rows); // Send the data as a JSON response
+        const maxMagnitudes = getMaxMagnitudePerMinute(rows);
+        const jsonArray = Object.entries(maxMagnitudes).map(([key, value]) => ({
+          [key]: value,
+        }));
+        res.json(jsonArray);
       },
       error(error) {
         console.error("Error querying data:", error);
