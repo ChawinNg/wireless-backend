@@ -185,16 +185,46 @@ app.get("/", (req, res) => {
   res.send("Socket.IO server running");
 });
 
-app.get("/data", async (req, res) => {
-  console.log(process.env.INFLUXDB_BUCKET);
-  console.log(process.env.INFLUXDB_ORG);
-  console.log(process.env.INFLUXDB_URL);
-  console.log(process.env.INFLUXDB_TOKEN);
+app.get("/accelerometer", async (req, res) => {
   const queryApi = client.getQueryApi(process.env.INFLUXDB_ORG);
   const query = `
     from(bucket: "wireless")
       |> range(start: -20h)
       |> filter(fn: (r) => r._measurement == "accelerometer")
+      |> filter(fn: (r) => r._field == "x" or r._field == "y" or r._field == "z" or r._field == "magnitude")
+      |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+  `;
+  try {
+    const rows = [];
+    queryApi.queryRows(query, {
+      next(row, tableMeta) {
+        const data = tableMeta.toObject(row);
+        rows.push(data);
+      },
+      complete() {
+        const maxMagnitudes = getMaxMagnitudePerMinute(rows);
+        const jsonArray = Object.entries(maxMagnitudes).map(([key, value]) => ({
+          [key]: value,
+        }));
+        res.json(jsonArray);
+      },
+      error(error) {
+        console.error("Error querying data:", error);
+        res.status(500).send("Error querying data");
+      },
+    });
+  } catch (error) {
+    console.error("Error querying data:", error);
+    res.status(500).send("Error querying data");
+  }
+});
+
+app.get("/gyroscope", async (req, res) => {
+  const queryApi = client.getQueryApi(process.env.INFLUXDB_ORG);
+  const query = `
+    from(bucket: "wireless")
+      |> range(start: -20h)
+      |> filter(fn: (r) => r._measurement == "gyroscope")
       |> filter(fn: (r) => r._field == "x" or r._field == "y" or r._field == "z" or r._field == "magnitude")
       |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
   `;
