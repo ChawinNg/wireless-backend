@@ -51,6 +51,7 @@ mqtt_client.on("message", async function (topic, message) {
   if (topic === "mpu") {
     const validJsonString = message.toString().replace(/'/g, '"');
 
+  const jsonObject = JSON.parse(validJsonString);
     const jsonObject = JSON.parse(validJsonString);
     // console.log(jsonObject);
 
@@ -85,6 +86,7 @@ mqtt_client.on("message", async function (topic, message) {
 
 // subscribe to topic 'my/test/topic'
 mqtt_client.subscribe("mpu");
+// mqtt_client.subscribe("gps");
 mqtt.client.subscribe("gps");
 
 const job = schedule.scheduleJob("* /1 * * * *", function () {
@@ -198,7 +200,7 @@ app.get("/accelerometer", async (req, res) => {
   const queryApi = client.getQueryApi(process.env.INFLUXDB_ORG);
   const query = `
     from(bucket: "wireless")
-      |> range(start: -20h)
+      |> range(start: -8h)
       |> filter(fn: (r) => r._measurement == "accelerometer")
       |> filter(fn: (r) => r._field == "x" or r._field == "y" or r._field == "z" or r._field == "magnitude")
       |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
@@ -232,7 +234,7 @@ app.get("/gyroscope", async (req, res) => {
   const queryApi = client.getQueryApi(process.env.INFLUXDB_ORG);
   const query = `
     from(bucket: "wireless")
-      |> range(start: -20h)
+      |> range(start: -8h)
       |> filter(fn: (r) => r._measurement == "gyroscope")
       |> filter(fn: (r) => r._field == "x" or r._field == "y" or r._field == "z" or r._field == "magnitude")
       |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
