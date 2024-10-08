@@ -86,7 +86,7 @@ mqtt_client.on("message", async function (topic, message) {
 
 // subscribe to topic 'my/test/topic'
 mqtt_client.subscribe("mpu");
-// mqtt_client.subscribe("gps");
+mqtt_client.subscribe("gps");
 // mqtt_client.subscribe("gps");
 
 const job = schedule.scheduleJob("* /1 * * * *", function () {
