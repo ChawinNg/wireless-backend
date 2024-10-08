@@ -51,7 +51,6 @@ mqtt_client.on("message", async function (topic, message) {
   if (topic === "mpu") {
     const validJsonString = message.toString().replace(/'/g, '"');
 
-  const jsonObject = JSON.parse(validJsonString);
     const jsonObject = JSON.parse(validJsonString);
     // console.log(jsonObject);
 
@@ -70,15 +69,16 @@ mqtt_client.on("message", async function (topic, message) {
       date
     );
 
+    console.log(jsonObject);
+
     if (gyroscopeMagnitude > 120 && accelerometerMagnitude > 10) {
-      console.log("true");
       io.emit("alert", { message: true });
     }
     io.emit("mqtt-message", { topic, message: jsonObject });
   } else if (topic === "gps") {
     const validJsonString = message.toString().replace(/'/g, '"');
     const jsonObject = JSON.parse(validJsonString);
-    console.log(jsonObject);
+    io.emit("mqtt-message", { topic, message: jsonObject });
     // uploadGPS(jsonObject.latitude, jsonObject.longitude, jsonObject.altitude);
     // io.emit("mqtt-message", { topic, message: jsonObject });
   }
@@ -87,7 +87,7 @@ mqtt_client.on("message", async function (topic, message) {
 // subscribe to topic 'my/test/topic'
 mqtt_client.subscribe("mpu");
 // mqtt_client.subscribe("gps");
-mqtt.client.subscribe("gps");
+// mqtt_client.subscribe("gps");
 
 const job = schedule.scheduleJob("* /1 * * * *", function () {
   console.log("The answer to life, the universe, and everything!");
